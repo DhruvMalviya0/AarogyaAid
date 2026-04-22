@@ -17,23 +17,21 @@ type ProfileForm = {
 };
 
 type RecommendationPayload = {
-  "Peer Comparison Table": Array<{
-    "Policy Name": string;
-    Insurer: string;
-    Premium: string;
-    "Cover Amount": string;
-    "Waiting Period": string;
-    Benefit: string;
-    "Suitability Score": number;
+  peer_comparison: Array<{
+    policy_name: string;
+    insurer: string;
+    monthly_premium: number;
+    cover_amount: string;
+    waiting_period_months: number;
+    key_benefit: string;
+    suitability_score: number;
   }>;
-  "Coverage Detail Table": Array<{
-    Inclusions: string;
-    Exclusions: string;
-    "Sub-limits": string;
-    "Co-pay": string;
-    "Claim type": string;
+  coverage_details: Array<{
+    Inclusions: string[];
+    Exclusions: string[];
   }>;
-  "Why This Policy": string;
+  empathetic_summary: string;
+  citations: string[];
 };
 
 const CONDITIONS = ["Diabetes", "Hypertension", "Asthma", "Thyroid", "Cardiac History", "None"];
@@ -135,11 +133,32 @@ export default function HealthProfileAdvisor() {
       createdAt: new Date().toISOString(),
     });
 
+    const topPolicy = result?.peer_comparison[0];
+    const normalizedQuestion = chatInput.trim().toLowerCase();
+    let assistantReply =
+      "I can explain exclusions, co-pay, waiting periods, and city network fit based on your profile and cited policy pages.";
+
+    if (topPolicy && (normalizedQuestion.includes("why") || normalizedQuestion.includes("score"))) {
+      assistantReply = `Because at your age of ${form.age}, your income band ${form.income}, and your condition profile (${form.conditions.join(
+        ", "
+      )}), ${topPolicy.policy_name} scored ${topPolicy.suitability_score}/100 with a lower waiting period (${topPolicy.waiting_period_months} months) and stronger claim-time affordability.`;
+    }
+
+    if (normalizedQuestion.includes("dental")) {
+      const detail = result?.coverage_details[0];
+      const includesDental =
+        !!detail &&
+        ([...detail.Inclusions, ...detail.Exclusions].join(" ").toLowerCase().includes("dental"));
+
+      if (!includesDental) {
+        assistantReply = `The provided documents for ${topPolicy?.policy_name ?? "the recommended policy"} do not specify dental coverage.`;
+      }
+    }
+
     append({
       id: crypto.randomUUID(),
       role: "assistant",
-      content:
-        "I understand your concern. I can explain exclusions, co-pay, waiting periods, and city network fit based on your profile.",
+      content: assistantReply,
       createdAt: new Date().toISOString(),
     });
 
@@ -210,34 +229,71 @@ export default function HealthProfileAdvisor() {
 
       {result ? (
         <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-          <h2 className="text-xl font-semibold text-slate-900">Peer Comparison Table</h2>
+          <h2 className="text-xl font-semibold text-slate-900">Recommendation</h2>
+          <p className="mt-2 text-sm leading-6 text-slate-700">
+            <strong>{form.name}</strong>, based on your condition profile ({form.conditions.join(", ")}), the recommended policy is
+            <strong> {result.peer_comparison[0]?.policy_name}</strong> with a suitability score of
+            <strong> {result.peer_comparison[0]?.suitability_score}/100</strong>.
+          </p>
+
+          <h3 className="mt-5 text-lg font-semibold text-slate-900">Feature Comparison (Top 2)</h3>
+          <Table
+            headers={[
+              "Feature",
+              `Recommended: ${result.peer_comparison[0]?.policy_name ?? "N/A"}`,
+              `Alternative: ${result.peer_comparison[1]?.policy_name ?? "N/A"}`,
+            ]}
+            rows={[
+              [
+                "Monthly Premium",
+                `INR ${result.peer_comparison[0]?.monthly_premium ?? "N/A"}`,
+                `INR ${result.peer_comparison[1]?.monthly_premium ?? "N/A"}`,
+              ],
+              [
+                "Waiting Period",
+                `${result.peer_comparison[0]?.waiting_period_months ?? "N/A"} months`,
+                `${result.peer_comparison[1]?.waiting_period_months ?? "N/A"} months`,
+              ],
+              [
+                "Suitability",
+                `${result.peer_comparison[0]?.suitability_score ?? "N/A"}/100`,
+                `${result.peer_comparison[1]?.suitability_score ?? "N/A"}/100`,
+              ],
+            ]}
+          />
+
+          <h2 className="mt-5 text-xl font-semibold text-slate-900">Peer Comparison (Evidence)</h2>
           <Table
             headers={["Policy Name", "Insurer", "Premium", "Cover Amount", "Waiting Period", "Benefit", "Suitability Score"]}
-            rows={result["Peer Comparison Table"].map((row) => [
-              row["Policy Name"],
-              row.Insurer,
-              row.Premium,
-              row["Cover Amount"],
-              row["Waiting Period"],
-              row.Benefit,
-              String(row["Suitability Score"]),
+            rows={result.peer_comparison.map((row) => [
+              row.policy_name,
+              row.insurer,
+              `INR ${row.monthly_premium}`,
+              row.cover_amount,
+              `${row.waiting_period_months} months`,
+              row.key_benefit,
+              String(row.suitability_score),
             ])}
           />
 
-          <h2 className="mt-5 text-xl font-semibold text-slate-900">Coverage Detail Table</h2>
+          <h2 className="mt-5 text-xl font-semibold text-slate-900">Coverage Details (Top Policy)</h2>
           <Table
-            headers={["Inclusions", "Exclusions", "Sub-limits", "Co-pay", "Claim type"]}
-            rows={result["Coverage Detail Table"].map((row) => [
-              row.Inclusions,
-              row.Exclusions,
-              row["Sub-limits"],
-              row["Co-pay"],
-              row["Claim type"],
+            headers={["Inclusions", "Exclusions"]}
+            rows={result.coverage_details.map((row) => [
+              row.Inclusions.join(", "),
+              row.Exclusions.join(", "),
             ])}
           />
 
-          <h2 className="mt-5 text-xl font-semibold text-slate-900">Why This Policy</h2>
-          <p className="mt-2 text-sm leading-6 text-slate-700">{result["Why This Policy"]}</p>
+          <h2 className="mt-5 text-xl font-semibold text-slate-900">Empathetic Summary</h2>
+          <p className="mt-2 text-sm leading-6 text-slate-700">{result.empathetic_summary}</p>
+
+          <h2 className="mt-5 text-xl font-semibold text-slate-900">Citations (Proof)</h2>
+          <ul className="mt-2 list-disc space-y-1 pl-5 text-sm text-slate-700">
+            {result.citations.map((citation) => (
+              <li key={citation}>{citation}</li>
+            ))}
+          </ul>
         </section>
       ) : null}
 

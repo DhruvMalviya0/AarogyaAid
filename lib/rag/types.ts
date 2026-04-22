@@ -14,6 +14,8 @@ export type PolicyChunk = {
   policyId: string;
   policyName: string;
   insurer: string;
+  sourceDocument?: string;
+  pageNumber?: number;
   content: string;
   premium: number;
   coverAmount: number;
@@ -28,25 +30,23 @@ export type PolicyChunk = {
 };
 
 export type RecommendationRow = {
-  "Policy Name": string;
-  Insurer: string;
-  Premium: string;
-  "Cover Amount": string;
-  "Waiting Period": string;
-  Benefit: string;
-  "Suitability Score": number;
+  policy_name: string;
+  insurer: string;
+  monthly_premium: number;
+  cover_amount: string;
+  waiting_period_months: number;
+  key_benefit: string;
+  suitability_score: number;
 };
 
 export type CoverageRow = {
-  Inclusions: string;
-  Exclusions: string;
-  "Sub-limits": string;
-  "Co-pay": string;
-  "Claim type": string;
+  Inclusions: string[];
+  Exclusions: string[];
 };
 
 export type RecommendationResponse = {
-  "Peer Comparison Table": RecommendationRow[];
-  "Coverage Detail Table": CoverageRow[];
-  "Why This Policy": string;
+  peer_comparison: RecommendationRow[];
+  coverage_details: CoverageRow[];
+  empathetic_summary: string;
+  citations: string[];
 };
