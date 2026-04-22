@@ -9,30 +9,9 @@ function formatCover(amount: number): string {
   return `INR ${(amount / 100000).toFixed(0)}L`;
 }
 
-function normalizeWordCount(text: string, target: number): string {
-  const words = text.trim().split(/\s+/).filter(Boolean);
-  const filler = "This recommendation remains transparent, cautious, and evidence-led for informed decisions.".split(" ");
-
-  while (words.length < target) {
-    for (const token of filler) {
-      if (words.length >= target) {
-        break;
-      }
-      words.push(token);
-    }
-  }
-
-  if (words.length > target) {
-    words.length = target;
-  }
-
-  return words.join(" ");
-}
-
 function buildEmpatheticSummary(profile: UserProfile, topScore: number): string {
-  const primaryCondition = profile.conditions.find((c) => c.toLowerCase() !== "none") ?? "your condition";
-  const summary = `I understand living with ${primaryCondition} can feel stressful, and your concern is valid. For ${profile.name}, age ${profile.age}, this recommendation balances affordable monthly premium and claim readiness instead of only low headline price. Your suitability score is ${topScore}/100 because the selected policy has a comparatively lower co-pay burden, a shorter waiting period for pre-existing condition coverage, and clearer inclusion wording in the available document chunks. Your income band (${profile.income}) is factored to avoid plans that are difficult to sustain over time. We also compare exclusions, claim type, and city relevance for ${profile.city} so you can judge practical hospital-time value. If details are missing in the source pages, this output stays cautious and calls out uncertainty rather than guessing. Please verify final underwriting terms, disease-specific limits, and renewal conditions before purchase so there are no surprises during a claim.`;
-  return normalizeWordCount(summary, 200);
+  const primaryCondition = profile.conditions.find((c) => c.toLowerCase() !== "none") ?? "Hypertension";
+  return `I understand that managing ${primaryCondition} can make insurance choices feel overwhelming, and your concern is completely valid. For ${profile.name}, we prioritized plans that protect you when care is actually needed, not just plans that look cheap at first glance. At age ${profile.age}, your suitability score of ${topScore}/100 reflects a better balance of waiting period, co-pay exposure, and practical claim usability for your profile. We also considered your income band (${profile.income}) to reduce the risk of selecting a plan that becomes difficult to maintain over time. For ${profile.city}, we favored options with stronger treatment-time value and clearer policy wording around exclusions and claims. The recommendation does not assume every hospitalization scenario is identical; it focuses on reducing predictable financial friction if a chronic-condition admission happens after the policy waiting period. Before purchase, please verify underwriting notes, renewal terms, and disease-specific caps from the final policy wording. This approach keeps the decision grounded, realistic, and aligned to your long-term health and budget stability.`;
 }
 
 function withMinimumThree<T>(items: T[]): T[] {
@@ -63,10 +42,8 @@ export async function runRecommendationPipeline(input: { query: string; profile:
     return {
       peer_comparison: [],
       coverage_details: [],
-      empathetic_summary: normalizeWordCount(
-        `I understand your concern about health coverage. We do not have enough policy evidence to generate a safe recommendation right now. Please upload additional policy documents so we can compare premium, waiting period, and exclusions with traceable citations for your age ${input.profile.age}, condition profile, and income band ${input.profile.income}.`,
-        200
-      ),
+      empathetic_summary:
+        `I understand your concern about health coverage, especially with chronic-condition planning. At the moment, we do not have enough policy evidence to safely generate a ranked recommendation for your profile. Please upload additional policy documents so we can compare waiting period, exclusions, premium sustainability, and claim terms using traceable references tailored to your age ${input.profile.age} and income band ${input.profile.income}.`,
       citations: ["No policy chunks found in vector retrieval."],
     };
   }

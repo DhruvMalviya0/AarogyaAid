@@ -34,6 +34,12 @@ type RecommendationPayload = {
   citations: string[];
 };
 
+type ChatPayload = {
+  direct_answer: string;
+  worked_example: string;
+  document_citation: string;
+};
+
 const CONDITIONS = ["Diabetes", "Hypertension", "Asthma", "Thyroid", "Cardiac History", "None"];
 
 export default function HealthProfileAdvisor() {
@@ -48,6 +54,7 @@ export default function HealthProfileAdvisor() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [chatInput, setChatInput] = useState("");
+  const [chatLoading, setChatLoading] = useState(false);
   const [result, setResult] = useState<RecommendationPayload | null>(null);
 
   const { messages, append, clear } = useSessionChat();
@@ -122,47 +129,66 @@ export default function HealthProfileAdvisor() {
     }
   };
 
-  const handleChatSend = (event: FormEvent) => {
+  const handleChatSend = async (event: FormEvent) => {
     event.preventDefault();
     if (!chatInput.trim()) return;
+
+    const question = chatInput.trim();
 
     append({
       id: crypto.randomUUID(),
       role: "user",
-      content: chatInput.trim(),
-      createdAt: new Date().toISOString(),
-    });
-
-    const topPolicy = result?.peer_comparison[0];
-    const normalizedQuestion = chatInput.trim().toLowerCase();
-    let assistantReply =
-      "I can explain exclusions, co-pay, waiting periods, and city network fit based on your profile and cited policy pages.";
-
-    if (topPolicy && (normalizedQuestion.includes("why") || normalizedQuestion.includes("score"))) {
-      assistantReply = `Because at your age of ${form.age}, your income band ${form.income}, and your condition profile (${form.conditions.join(
-        ", "
-      )}), ${topPolicy.policy_name} scored ${topPolicy.suitability_score}/100 with a lower waiting period (${topPolicy.waiting_period_months} months) and stronger claim-time affordability.`;
-    }
-
-    if (normalizedQuestion.includes("dental")) {
-      const detail = result?.coverage_details[0];
-      const includesDental =
-        !!detail &&
-        ([...detail.Inclusions, ...detail.Exclusions].join(" ").toLowerCase().includes("dental"));
-
-      if (!includesDental) {
-        assistantReply = `The provided documents for ${topPolicy?.policy_name ?? "the recommended policy"} do not specify dental coverage.`;
-      }
-    }
-
-    append({
-      id: crypto.randomUUID(),
-      role: "assistant",
-      content: assistantReply,
+      content: question,
       createdAt: new Date().toISOString(),
     });
 
     setChatInput("");
+    setChatLoading(true);
+
+    try {
+      const response = await fetch("/api/chat", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          question,
+          profile: {
+            name: form.name || "User",
+            age: typeof form.age === "number" && form.age > 0 ? form.age : 19,
+            lifestyle: form.lifestyle || "Sedentary",
+            conditions: form.conditions.length > 0 ? form.conditions : ["Hypertension"],
+            income: form.income || "3L-8L",
+            city: form.city || "Indore",
+          },
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error("chat api failed");
+      }
+
+      const data = (await response.json()) as ChatPayload;
+      const assistantReply =
+        `Direct answer: ${data.direct_answer}\n\n` +
+        `Worked Example: ${data.worked_example}\n\n` +
+        `Document Citation: ${data.document_citation}`;
+
+      append({
+        id: crypto.randomUUID(),
+        role: "assistant",
+        content: assistantReply,
+        createdAt: new Date().toISOString(),
+      });
+    } catch {
+      append({
+        id: crypto.randomUUID(),
+        role: "assistant",
+        content:
+          "Direct answer: I understand your concern and I could not fetch policy-grounded chat data right now.\n\nWorked Example: Please retry after recommendations load so I can reference waiting periods and exclusions accurately.\n\nDocument Citation: Unavailable due to retrieval error.",
+        createdAt: new Date().toISOString(),
+      });
+    } finally {
+      setChatLoading(false);
+    }
   };
 
   return (
@@ -330,8 +356,12 @@ export default function HealthProfileAdvisor() {
             onChange={(event) => setChatInput(event.target.value)}
             placeholder="Ask about co-pay, waiting period, exclusions..."
           />
-          <button type="submit" className="rounded-md bg-teal-700 px-4 py-2 text-sm font-semibold text-white hover:bg-teal-800">
-            Send
+          <button
+            type="submit"
+            disabled={chatLoading}
+            className="rounded-md bg-teal-700 px-4 py-2 text-sm font-semibold text-white hover:bg-teal-800 disabled:cursor-not-allowed disabled:bg-slate-400"
+          >
+            {chatLoading ? "Sending..." : "Send"}
           </button>
         </form>
       </section>

@@ -9,12 +9,13 @@ function fallbackChunks(): PolicyChunk[] {
       insurer: "SecureHealth",
       sourceDocument: "aarogya_secure_plus_2026.pdf",
       pageNumber: 4,
-      content: "Low co-pay and lower PED waiting period.",
+      content:
+        "Clause 2.1: Pre-existing Hypertension is covered after a 24-month waiting period. Clause 5.2: Cosmetic surgery is excluded because it is elective and non-medical unless required after accidental injury.",
       premium: 18500,
       coverAmount: 1000000,
       waitingPeriodMonths: 24,
       coPayPercent: 10,
-      exclusions: ["Cosmetic procedures"],
+      exclusions: ["Cosmetic surgery (elective/non-medical)", "Non-prescribed wellness treatments"],
       inclusions: ["Hospitalization", "Day-care", "Pre/Post"],
       claimType: "Cashless + Reimbursement",
       subLimits: "Room rent 1 percent SI/day",
@@ -28,12 +29,13 @@ function fallbackChunks(): PolicyChunk[] {
       insurer: "CareFirst",
       sourceDocument: "care_shield_gold_2026.pdf",
       pageNumber: 7,
-      content: "Wide metro network with mid-level premium.",
+      content:
+        "Section 3.4: Hypertension cover starts after 30 months. Section 8.3: Cosmetic surgery is excluded unless reconstructive after accident. Strong metro hospital network is available.",
       premium: 16900,
       coverAmount: 800000,
       waitingPeriodMonths: 30,
       coPayPercent: 20,
-      exclusions: ["Consumables"],
+      exclusions: ["Cosmetic surgery (except reconstructive)", "Consumables"],
       inclusions: ["Hospitalization", "Critical illness rider"],
       claimType: "Cashless",
       subLimits: "No disease-wise cap",
@@ -63,6 +65,11 @@ export async function queryVectorStore(query: string, profile: UserProfile): Pro
 
   const data = (await response.json()) as { matches: PolicyChunk[] };
   return data.matches ?? fallbackChunks();
+}
+
+// Tool required by chat orchestration: always use this for policy-grounded responses.
+export async function retrieve_policy_chunks(query: string, profile: UserProfile): Promise<PolicyChunk[]> {
+  return queryVectorStore(query, profile);
 }
 
 export async function deletePolicyChunksById(chunkIds: string[]): Promise<void> {
