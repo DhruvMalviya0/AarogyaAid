@@ -118,6 +118,109 @@ class RetrievePolicyChunksInput(BaseModel):
     )
 
 
+class PeerComparisonRow(BaseModel):
+    """One row in the peer comparison table with exactly 7 required columns."""
+
+    policy_name: str = Field(..., alias="Policy Name")
+    insurer: str = Field(..., alias="Insurer")
+    premium: str | float = Field(..., alias="Premium")
+    cover_amount: str | float = Field(..., alias="Cover Amount")
+    waiting_period: str = Field(..., alias="Waiting Period")
+    benefit: str = Field(..., alias="Benefit")
+    suitability_score: float = Field(..., alias="Suitability Score", ge=0.0, le=100.0)
+
+    model_config = {
+        "populate_by_name": True,
+        "extra": "forbid",
+    }
+
+
+class CoverageDetailRow(BaseModel):
+    """One row in the coverage detail table."""
+
+    inclusions: str = Field(..., alias="Inclusions")
+    exclusions: str = Field(..., alias="Exclusions")
+    sub_limits: str = Field(..., alias="Sub-limits")
+    co_pay: str = Field(..., alias="Co-pay")
+    claim_type: str = Field(..., alias="Claim type")
+
+    model_config = {
+        "populate_by_name": True,
+        "extra": "forbid",
+    }
+
+
+class InsuranceAdvisorOutput(BaseModel):
+    """Structured output expected from the insurance advisor agent."""
+
+    peer_comparison_table: list[PeerComparisonRow] = Field(..., alias="Peer Comparison Table", min_length=1)
+    coverage_detail_table: list[CoverageDetailRow] = Field(..., alias="Coverage Detail Table", min_length=1)
+    why_this_policy: str = Field(..., alias="Why This Policy")
+
+    model_config = {
+        "populate_by_name": True,
+        "extra": "forbid",
+    }
+
+
+# JSON schema you can pass to your LLM output parser / response format config.
+INSURANCE_ADVISOR_OUTPUT_JSON_SCHEMA: dict[str, Any] = InsuranceAdvisorOutput.model_json_schema(by_alias=True)
+
+
+def _word_count(text: str) -> int:
+    return len(text.split())
+
+
+def parse_insurance_advisor_output(raw_output: str | dict[str, Any], user_profile: dict[str, Any]) -> dict[str, Any]:
+    """
+    Parse and validate model output for AarogyaAid advisor.
+
+    Enforces:
+    - Required table structures and columns.
+    - "Why This Policy" must be exactly 200 words.
+    - "Why This Policy" must explicitly mention user's age, at least one condition, and income.
+
+    Returns validated output as a dict using required alias keys.
+    """
+    payload: dict[str, Any]
+    if isinstance(raw_output, str):
+        try:
+            payload = json.loads(raw_output)
+        except json.JSONDecodeError as exc:
+            raise ValueError("Agent output is not valid JSON") from exc
+    elif isinstance(raw_output, dict):
+        payload = raw_output
+    else:
+        raise TypeError("raw_output must be either a JSON string or dict")
+
+    validated = InsuranceAdvisorOutput.model_validate(payload)
+    result = validated.model_dump(by_alias=True)
+
+    why_text = result["Why This Policy"]
+    words = _word_count(why_text)
+    if words != 200:
+        raise ValueError(f'"Why This Policy" must be exactly 200 words, found {words}')
+
+    age = user_profile.get("age")
+    if age is not None and str(age) not in why_text:
+        raise ValueError('"Why This Policy" must explicitly mention the user\'s Age')
+
+    conditions = user_profile.get("pre_existing_conditions", [])
+    if conditions:
+        normalized = why_text.lower()
+        if not any(str(condition).strip().lower() in normalized for condition in conditions):
+            raise ValueError('"Why This Policy" must explicitly mention at least one user Condition')
+
+    income = user_profile.get("income")
+    if income is not None:
+        income_str = str(income)
+        income_comma = f"{income:,}" if isinstance(income, (int, float)) else income_str
+        if income_str not in why_text and income_comma not in why_text:
+            raise ValueError('"Why This Policy" must explicitly mention the user\'s Income')
+
+    return result
+
+
 rag = InsuranceRAG(InsuranceRAGConfig())
 
 
