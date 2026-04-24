@@ -21,7 +21,12 @@ ADMIN_PASSWORD=your_secure_password
 
 ### 3. Installation & Local Development
 ```bash
+# Clone and setup in one go
+git clone https://github.com/DhruvMalviya0/AarogyaAid.git
+cd AarogyaAid
 npm install
+cp .env.example .env.local
+# NOTE: User must fill .env.local with their own keys at this point
 npm run dev
 ```
 [cite_start]Access the application at `http://localhost:3000`. [cite: 100]
