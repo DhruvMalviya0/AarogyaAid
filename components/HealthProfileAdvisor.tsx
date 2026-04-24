@@ -210,27 +210,31 @@ export default function HealthProfileAdvisor() {
           <Input label="Name" value={form.name} onChange={(v) => setForm((p) => ({ ...p, name: v }))} />
 
           <Input
-            label="Age (int)"
+            label="Age"
             type="number"
+            min="1"
             value={String(form.age)}
-            onChange={(v) => setForm((p) => ({ ...p, age: v ? Number.parseInt(v, 10) : "" }))}
+            onChange={(v) => {
+              const parsed = v ? Number.parseInt(v, 10) : NaN;
+              setForm((p) => ({ ...p, age: Number.isFinite(parsed) && parsed > 0 ? parsed : "" }));
+            }}
           />
 
           <Select
-            label="Lifestyle (dropdown)"
+            label="Lifestyle"
             value={form.lifestyle}
             options={["Sedentary", "Moderately Active", "Active"]}
             onChange={(v) => setForm((p) => ({ ...p, lifestyle: v as LifestyleOption }))}
           />
 
           <Select
-            label="Income (dropdown)"
+            label="Income"
             value={form.income}
             options={["<3L", "3L-8L", "8L-15L", ">15L"]}
             onChange={(v) => setForm((p) => ({ ...p, income: v as IncomeOption }))}
           />
 
-          <Input label="City (dropdown)" value={form.city} onChange={(v) => setForm((p) => ({ ...p, city: v }))} />
+          <Input label="City" value={form.city} onChange={(v) => setForm((p) => ({ ...p, city: v }))} />
 
           <fieldset className="rounded-lg border border-slate-200 p-3 md:col-span-2">
             <legend className="px-1 text-sm font-medium text-slate-700">Conditions (multi-select)</legend>
