@@ -159,6 +159,15 @@ export default function HealthProfileAdvisor() {
             income: form.income || "3L-8L",
             city: form.city || "Indore",
           },
+          previous_recommendation: result?.peer_comparison[0]
+            ? {
+                policy_name: result.peer_comparison[0].policy_name,
+                insurer: result.peer_comparison[0].insurer,
+                monthly_premium: result.peer_comparison[0].monthly_premium,
+                waiting_period_months: result.peer_comparison[0].waiting_period_months,
+                suitability_score: result.peer_comparison[0].suitability_score,
+              }
+            : undefined,
         }),
       });
 

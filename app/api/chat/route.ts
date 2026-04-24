@@ -1,11 +1,19 @@
 import { NextRequest, NextResponse } from "next/server";
 
+import { AAROGYAAID_AGENT_CONFIG } from "@/lib/rag/agentConfig";
 import { UserProfile } from "@/lib/rag/types";
 import { retrieve_policy_chunks } from "@/lib/rag/vectorStore";
 
 type ChatBody = {
   question: string;
   profile: UserProfile;
+  previous_recommendation?: {
+    policy_name: string;
+    insurer: string;
+    monthly_premium: number;
+    waiting_period_months: number;
+    suitability_score: number;
+  };
 };
 
 type ChatResponse = {
@@ -33,10 +41,16 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "question and profile are required" }, { status: 400 });
     }
 
-    // Strict grounding requirement: retrieve policy chunks for every user question.
+    // Strict grounding requirement: always use configured retrieval tool for policy-grounded answers.
+    const retrievalTool = AAROGYAAID_AGENT_CONFIG.retrievalToolName;
+    if (retrievalTool !== "retrieve_policy_chunks") {
+      return NextResponse.json({ error: "retrieval tool misconfigured" }, { status: 500 });
+    }
+
     const chunks = await retrieve_policy_chunks(body.question, body.profile);
     const top = chunks[0];
     const condition = primaryCondition(body.profile);
+    const prior = body.previous_recommendation;
 
     if (!top) {
       const fallback: ChatResponse = {
@@ -63,6 +77,10 @@ export async function POST(request: NextRequest) {
     const question = body.question.toLowerCase();
     let directAnswer =
       `I understand your concern about ${condition}. Based on the policy wording, this plan can be evaluated using waiting period (${top.waitingPeriodMonths} months), co-pay (${top.coPayPercent}%), and exclusions.`;
+
+    if (prior) {
+      directAnswer += ` Your previous recommendation was ${prior.policy_name} by ${prior.insurer} (score ${prior.suitability_score}/100, waiting period ${prior.waiting_period_months} months, monthly premium INR ${prior.monthly_premium}).`;
+    }
 
     if (question.includes("cosmetic") || question.includes("exclusion")) {
       const exclusionLine = top.exclusions.find((e) => e.toLowerCase().includes("cosmetic")) ?? top.exclusions[0] ?? "elective non-medical procedures";

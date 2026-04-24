@@ -72,14 +72,33 @@ export async function retrieve_policy_chunks(query: string, profile: UserProfile
   return queryVectorStore(query, profile);
 }
 
-export async function deletePolicyChunksById(chunkIds: string[]): Promise<void> {
-  const vectorStoreUrl = process.env.VECTOR_STORE_URL;
-  if (!vectorStoreUrl) return;
+export type DeleteChunksResult = {
+  deletedCount: number;
+  deletedAt: string;
+  immediate: true;
+};
 
-  await fetch(`${vectorStoreUrl}/delete`, {
+export async function deletePolicyChunksById(chunkIds: string[]): Promise<DeleteChunksResult> {
+  const vectorStoreUrl = process.env.VECTOR_STORE_URL;
+  if (!vectorStoreUrl) {
+    throw new Error("VECTOR_STORE_URL is not configured. Cannot guarantee immediate deletion.");
+  }
+
+  const response = await fetch(`${vectorStoreUrl}/delete`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ ids: chunkIds }),
     cache: "no-store",
   });
+
+  if (!response.ok) {
+    throw new Error("Vector store deletion failed.");
+  }
+
+  const data = (await response.json().catch(() => ({}))) as { deletedCount?: number };
+  return {
+    deletedCount: data.deletedCount ?? chunkIds.length,
+    deletedAt: new Date().toISOString(),
+    immediate: true,
+  };
 }
